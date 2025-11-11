@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login / Signup | Game Portal</title>
-  <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
+  <title>Login / Signup | Supabase</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * {margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif;}
     body {
@@ -61,60 +61,53 @@
 </div>
 
 <script>
-  // Slide animation between Login & Signup
+  // === Page animation ===
   const container = document.getElementById("container");
   document.getElementById("toSignup").addEventListener("click", ()=>container.classList.add("active"));
   document.getElementById("toLogin").addEventListener("click", ()=>container.classList.remove("active"));
 
-  // Appwrite Configuration
-  const client = new Appwrite.Client()
-    .setEndpoint("https://cloud.appwrite.io/v1")
-    .setProject("project-fra-69130680003614241257");
+  // === Supabase Setup ===
+  const supabase = window.supabase.createClient(
+    "https://ddicvwyrmofsrvunjpsp.supabase.co",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaWN2d3lybW9mc3J2dW5qcHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4NDA5NjUsImV4cCI6MjA3ODQxNjk2NX0.6TyAjszkQaS28iv03W2bSQStFlaKA9sw3iB7hGO0Fo0"
+  );
 
-  const account = new Appwrite.Account(client);
-  const databases = new Appwrite.Databases(client);
-
-  const databaseId = "database-69130a1b0008aa5fa204";
-  const usersTableId = "table-users";
-
-  // SIGNUP
+  // === SIGNUP ===
   document.getElementById("signupBtn").addEventListener("click", async () => {
     const username = document.getElementById("signupUsername").value.trim();
     const email = document.getElementById("signupEmail").value.trim();
     const password = document.getElementById("signupPassword").value.trim();
 
     try {
-      const res = await account.create('unique()', email, password, username);
-      alert("✅ Account created successfully!");
-      container.classList.remove("active");
+      // Create Supabase Auth account
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+      alert("✅ Account created successfully! Please check your email for confirmation.");
 
-      // Create a user record in your users table
-      await databases.createDocument(databaseId, usersTableId, 'unique()', {
-        username, email, points: 0
-      });
+      // Add to 'users' table
+      await supabase.from("users").insert([{ username, email, points: 0 }]);
+      container.classList.remove("active");
     } catch (err) {
-      alert("❌ Error: " + err.message);
+      alert("❌ " + err.message);
     }
   });
 
-  // LOGIN
+  // === LOGIN ===
   document.getElementById("loginBtn").addEventListener("click", async () => {
     const email = document.getElementById("loginEmail").value.trim();
     const password = document.getElementById("loginPassword").value.trim();
 
     try {
-      await account.createEmailPasswordSession(email, password);
-      const user = await account.get();
-      alert(`✅ Welcome back, ${user.name || user.email}!`);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
 
-      // Fetch user data (points)
-      const res = await databases.listDocuments(databaseId, usersTableId, [
-        Appwrite.Query.equal("email", [email])
-      ]);
-      if (res.documents.length > 0) {
-        const data = res.documents[0];
-        alert(`You currently have ${data.points} points 🎯`);
-      }
+      const { data: userData } = await supabase
+        .from("users")
+        .select("username, points")
+        .eq("email", email)
+        .single();
+
+      alert(`🎉 Welcome ${userData.username}! You have ${userData.points} points.`);
     } catch (err) {
       alert("❌ Login failed: " + err.message);
     }
