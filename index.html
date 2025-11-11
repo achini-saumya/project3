@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guess & Reward Game</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    #points, #balance { font-weight: bold; }
+    .game-section { margin-top: 20px; }
+    input { padding: 8px; margin: 5px; width: 200px; }
+  </style>
+</head>
+<body>
+
+  <h1>Guess & Reward Game</h1>
+
+  <!-- Auth Section -->
+  <div id="auth-section">
+    <h2>Login / Sign Up</h2>
+    <input type="email" id="email" placeholder="Email"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button onclick="signup()">Sign Up</button>
+    <button onclick="login()">Login</button>
+    <p id="auth-msg"></p>
+  </div>
+
+  <!-- Game Section -->
+  <div class="game-section" style="display:none;">
+    <p>Points: <span id="points">0</span> | Balance: $<span id="balance">0.00</span></p>
+    <p id="question">Click Start to play!</p>
+    <button onclick="startGame()">Start Game</button>
+    <div id="answers"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // Supabase config (YOUR URL and anon key)
+    const SUPABASE_URL = "https://ddicvwyrmofsrvunjpsp.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaWN2d3lybW9mc3J2dW5qcHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4NDA5NjUsImV4cCI6MjA3ODQxNjk2NX0.6TyAjszkQaS28iv03W2bSQStFlaKA9sw3iB7hGO0Fo0";
+
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let userId = null;
+    let currentQuestion = null;
+    let points = 0;
+
+    // Sample questions
+    const questions = [
+      { question: "Guess the color of the sky?", answers: ["Blue","Red","Green","Yellow"], correct: "Blue" },
+      { question: "Guess the fruit: Red & sweet?", answers: ["Apple","Banana","Mango","Orange"], correct: "Apple" },
+      { question: "Guess the vehicle: Moves on tracks?", answers: ["Train","Car","Bike","Plane"], correct: "Train" }
+    ];
+
+    // --- Authentication functions ---
+    async function signup(){
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if(error){
+        document.getElementById('auth-msg').textContent = error.message;
+      } else {
+        document.getElementById('auth-msg').textContent = "Sign up successful! Check your email to confirm.";
+      }
+    }
+
+    async function login(){
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if(error){
+        document.getElementById('auth-msg').textContent = error.message;
+      } else {
+        document.getElementById('auth-msg').textContent = "Login successful!";
+        startGameAfterLogin(data.user);
+      }
+    }
+
+    async function startGameAfterLogin(user){
+      // Hide auth section
+      document.getElementById('auth-section').style.display = 'none';
+      document.querySelector('.game-section').style.display = 'block';
+
+      // Check if user exists in users table
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if(!data){
+        // Create new row for this user
+        await supabase.from('users').insert([{ id: user.id, username: user.email, points: 0 }]);
+        points = 0;
+      } else {
+        points = data.points;
+      }
+      userId = user.id;
+      updatePointsUI(points);
+    }
+
+    function updatePointsUI(points){
+      document.getElementById('points').textContent = points;
+      document.getElementById('balance').textContent = (points/1000*0.1).toFixed(2);
+    }
+
+    async function addPoint(){
+      const { data, error } = await supabase
+        .from('users')
+        .update({ points: supabase.raw('points + 1'), last_played: new Date() })
+        .eq('id', userId)
+        .select();
+
+      if(error){ console.error(error); return; }
+      points = data[0].points;
+      updatePointsUI(points);
+    }
+
+    // --- Game logic ---
+    function startGame(){
+      const randomIndex = Math.floor(Math.random()*questions.length);
+      currentQuestion = questions[randomIndex];
+
+      document.getElementById('question').textContent = currentQuestion.question;
+
+      const answersDiv = document.getElementById('answers');
+      answersDiv.innerHTML = '';
+      currentQuestion.answers.forEach(ans => {
+        const btn = document.createElement('button');
+        btn.textContent = ans;
+        btn.onclick = () => checkAnswer(ans);
+        answersDiv.appendChild(btn);
+      });
+    }
+
+    function checkAnswer(answer){
+      if(answer === currentQuestion.correct){
+        alert("Correct! +1 Point");
+        addPoint();
+      } else {
+        alert("Wrong! Try Again");
+      }
+      startGame(); // new question
+    }
+  </script>
+</body>
+</html>
