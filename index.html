@@ -1,159 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Guess & Reward Game</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login / Signup | Game Portal</title>
+  <script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
-    #points, #balance { font-weight: bold; }
-    .game-section { margin-top: 20px; }
-    input { padding: 8px; margin: 5px; width: 200px; }
+    * {margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif;}
+    body {
+      display:flex; justify-content:center; align-items:center;
+      height:100vh; background:linear-gradient(135deg,#ffc1cc,#ffe6f0);
+    }
+    .container {
+      position:relative; width:350px; height:470px; overflow:hidden;
+      border-radius:20px; background:white; box-shadow:0 10px 25px rgba(0,0,0,0.15);
+    }
+    .forms {position:absolute; width:100%; height:200%; top:0; transition:transform 1s ease;}
+    .container.active .forms {transform:translateY(-50%);}
+    .form-box {width:100%; height:50%; padding:40px 30px;
+      display:flex; flex-direction:column; justify-content:center; align-items:center;}
+    .form-box h2 {margin-bottom:20px; color:#ff4d88;}
+    .form-box input {
+      width:100%; padding:12px; margin:8px 0; border:2px solid #ffc1cc;
+      border-radius:12px; outline:none; font-size:14px; transition:0.3s ease;
+    }
+    .form-box input:focus {border-color:#ff4d88;}
+    .form-box button {
+      width:100%; padding:12px; margin-top:15px; background:#ff4d88;
+      color:white; border:none; border-radius:12px; font-size:16px; cursor:pointer;
+      transition:0.3s ease;
+    }
+    .form-box button:hover {background:#e6005c;}
+    .toggle {margin-top:20px; font-size:14px;}
+    .toggle a {color:#ff4d88; font-weight:bold; cursor:pointer; text-decoration:none;}
   </style>
 </head>
 <body>
 
-  <h1>Guess & Reward Game</h1>
+<div class="container" id="container">
+  <div class="forms">
+    <!-- Login Form -->
+    <div class="form-box login">
+      <h2>Login</h2>
+      <input type="email" id="loginEmail" placeholder="Email" required />
+      <input type="password" id="loginPassword" placeholder="Password" required />
+      <button id="loginBtn">Login</button>
+      <div class="toggle">Don’t have an account? <a id="toSignup">Sign Up</a></div>
+    </div>
 
-  <!-- Auth Section -->
-  <div id="auth-section">
-    <h2>Login / Sign Up</h2>
-    <input type="email" id="email" placeholder="Email"><br>
-    <input type="password" id="password" placeholder="Password"><br>
-    <button onclick="signup()">Sign Up</button>
-    <button onclick="login()">Login</button>
-    <p id="auth-msg"></p>
+    <!-- Signup Form -->
+    <div class="form-box signup">
+      <h2>Sign Up</h2>
+      <input type="text" id="signupUsername" placeholder="Username" required />
+      <input type="email" id="signupEmail" placeholder="Email" required />
+      <input type="password" id="signupPassword" placeholder="Password" required />
+      <button id="signupBtn">Sign Up</button>
+      <div class="toggle">Already have an account? <a id="toLogin">Login</a></div>
+    </div>
   </div>
+</div>
 
-  <!-- Game Section -->
-  <div class="game-section" style="display:none;">
-    <p>Points: <span id="points">0</span> | Balance: $<span id="balance">0.00</span></p>
-    <p id="question">Click Start to play!</p>
-    <button onclick="startGame()">Start Game</button>
-    <div id="answers"></div>
-  </div>
+<script>
+  // Slide animation between Login & Signup
+  const container = document.getElementById("container");
+  document.getElementById("toSignup").addEventListener("click", ()=>container.classList.add("active"));
+  document.getElementById("toLogin").addEventListener("click", ()=>container.classList.remove("active"));
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    // Supabase config
-    const SUPABASE_URL = "https://ddicvwyrmofsrvunjpsp.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaWN2d3lybW9mc3J2dW5qcHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4NDA5NjUsImV4cCI6MjA3ODQxNjk2NX0.6TyAjszkQaS28iv03W2bSQStFlaKA9sw3iB7hGO0Fo0";
+  // Appwrite Configuration
+  const client = new Appwrite.Client()
+    .setEndpoint("https://cloud.appwrite.io/v1")
+    .setProject("project-fra-69130680003614241257");
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const account = new Appwrite.Account(client);
+  const databases = new Appwrite.Databases(client);
 
-    let userId = null;
-    let currentQuestion = null;
-    let points = 0;
+  const databaseId = "database-69130a1b0008aa5fa204";
+  const usersTableId = "table-users";
 
-    // Sample questions
-    const questions = [
-      { question: "Guess the color of the sky?", answers: ["Blue","Red","Green","Yellow"], correct: "Blue" },
-      { question: "Guess the fruit: Red & sweet?", answers: ["Apple","Banana","Mango","Orange"], correct: "Apple" },
-      { question: "Guess the vehicle: Moves on tracks?", answers: ["Train","Car","Bike","Plane"], correct: "Train" }
-    ];
+  // SIGNUP
+  document.getElementById("signupBtn").addEventListener("click", async () => {
+    const username = document.getElementById("signupUsername").value.trim();
+    const email = document.getElementById("signupEmail").value.trim();
+    const password = document.getElementById("signupPassword").value.trim();
 
-    // --- Authentication functions ---
-    async function signup(){
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
+    try {
+      const res = await account.create('unique()', email, password, username);
+      alert("✅ Account created successfully!");
+      container.classList.remove("active");
 
-      if(!email || !password || password.length < 6){
-        document.getElementById('auth-msg').textContent = "Enter valid email and password ≥ 6 characters";
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if(error){
-        document.getElementById('auth-msg').textContent = error.message;
-      } else {
-        document.getElementById('auth-msg').textContent = "Sign up successful!";
-        // Create user row immediately
-        await supabase.from('users').insert([{ id: data.user.id, username: email, points: 0 }]);
-      }
-    }
-
-    async function login(){
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-
-      if(!email || !password){
-        document.getElementById('auth-msg').textContent = "Enter email and password";
-        return;
-      }
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if(error){
-        document.getElementById('auth-msg').textContent = error.message;
-      } else {
-        document.getElementById('auth-msg').textContent = "Login successful!";
-        startGameAfterLogin(data.user);
-      }
-    }
-
-    async function startGameAfterLogin(user){
-      document.getElementById('auth-section').style.display = 'none';
-      document.querySelector('.game-section').style.display = 'block';
-
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if(!data){
-        await supabase.from('users').insert([{ id: user.id, username: user.email, points: 0 }]);
-        points = 0;
-      } else {
-        points = data.points;
-      }
-      userId = user.id;
-      updatePointsUI(points);
-    }
-
-    function updatePointsUI(points){
-      document.getElementById('points').textContent = points;
-      document.getElementById('balance').textContent = (points/1000*0.1).toFixed(2);
-    }
-
-    async function addPoint(){
-      const { data, error } = await supabase
-        .from('users')
-        .update({ points: supabase.raw('points + 1'), last_played: new Date() })
-        .eq('id', userId)
-        .select();
-
-      if(error){ console.error(error); return; }
-      points = data[0].points;
-      updatePointsUI(points);
-    }
-
-    // --- Game logic ---
-    function startGame(){
-      const randomIndex = Math.floor(Math.random()*questions.length);
-      currentQuestion = questions[randomIndex];
-
-      document.getElementById('question').textContent = currentQuestion.question;
-
-      const answersDiv = document.getElementById('answers');
-      answersDiv.innerHTML = '';
-      currentQuestion.answers.forEach(ans => {
-        const btn = document.createElement('button');
-        btn.textContent = ans;
-        btn.onclick = () => checkAnswer(ans);
-        answersDiv.appendChild(btn);
+      // Create a user record in your users table
+      await databases.createDocument(databaseId, usersTableId, 'unique()', {
+        username, email, points: 0
       });
+    } catch (err) {
+      alert("❌ Error: " + err.message);
     }
+  });
 
-    function checkAnswer(answer){
-      if(answer === currentQuestion.correct){
-        alert("Correct! +1 Point");
-        addPoint();
-      } else {
-        alert("Wrong! Try Again");
+  // LOGIN
+  document.getElementById("loginBtn").addEventListener("click", async () => {
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value.trim();
+
+    try {
+      await account.createEmailPasswordSession(email, password);
+      const user = await account.get();
+      alert(`✅ Welcome back, ${user.name || user.email}!`);
+
+      // Fetch user data (points)
+      const res = await databases.listDocuments(databaseId, usersTableId, [
+        Appwrite.Query.equal("email", [email])
+      ]);
+      if (res.documents.length > 0) {
+        const data = res.documents[0];
+        alert(`You currently have ${data.points} points 🎯`);
       }
-      startGame();
+    } catch (err) {
+      alert("❌ Login failed: " + err.message);
     }
-  </script>
+  });
+</script>
+
 </body>
 </html>
