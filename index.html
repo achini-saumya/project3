@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Game Portal | Login & Signup</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 <style>
   * {margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif;}
   body {display:flex; justify-content:center; align-items:center; height:100vh; background:linear-gradient(135deg,#ffc1cc,#ffe6f0);}
@@ -28,8 +28,8 @@
     <!-- Login Form -->
     <div class="form-box login">
       <h2>Login</h2>
-      <input type="email" id="loginEmail" placeholder="Email" required />
-      <input type="password" id="loginPassword" placeholder="Password" required />
+      <input type="email" id="loginEmail" placeholder="Email" required>
+      <input type="password" id="loginPassword" placeholder="Password" required>
       <button id="loginBtn">Login</button>
       <div class="toggle">Don’t have an account? <a id="toSignup">Sign Up</a></div>
     </div>
@@ -37,9 +37,9 @@
     <!-- Signup Form -->
     <div class="form-box signup">
       <h2>Sign Up</h2>
-      <input type="text" id="signupUsername" placeholder="Username" required />
-      <input type="email" id="signupEmail" placeholder="Email" required />
-      <input type="password" id="signupPassword" placeholder="Password" required />
+      <input type="text" id="signupUsername" placeholder="Username" required>
+      <input type="email" id="signupEmail" placeholder="Email" required>
+      <input type="password" id="signupPassword" placeholder="Password" required>
       <button id="signupBtn">Sign Up</button>
       <div class="toggle">Already have an account? <a id="toLogin">Login</a></div>
     </div>
@@ -49,17 +49,17 @@
 <script>
   // Slide toggle
   const container = document.getElementById("container");
-  document.getElementById("toSignup").addEventListener("click", ()=>container.classList.add("active"));
-  document.getElementById("toLogin").addEventListener("click", ()=>container.classList.remove("active"));
+  document.getElementById("toSignup").addEventListener("click", () => container.classList.add("active"));
+  document.getElementById("toLogin").addEventListener("click", () => container.classList.remove("active"));
 
   // Supabase setup
-  const supabaseUrl = "https://ddicvwyrmofsrvunjpsp.supabase.co"; // your URL
-  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaWN2d3lybW9mc3J2dW5qcHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4NDA5NjUsImV4cCI6MjA3ODQxNjk2NX0.6TyAjszkQaS28iv03W2bSQStFlaKA9sw3iB7hGO0Fo0"; // your anon key
+  const supabaseUrl = "https://ddicvwyrmofsrvunjpsp.supabase.co"; // replace with your URL
+  const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaWN2d3lybW9mc3J2dW5qcHNwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI4NDA5NjUsImV4cCI6MjA3ODQxNjk2NX0.6TyAjszkQaS28iv03W2bSQStFlaKA9sw3iB7hGO0Fo0"; // replace with your anon key
   const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
   const usersTable = "users"; // your table name
 
-  // Signup
+  // SIGNUP
   document.getElementById("signupBtn").addEventListener("click", async () => {
     const username = document.getElementById("signupUsername").value.trim();
     const email = document.getElementById("signupEmail").value.trim();
@@ -68,10 +68,11 @@
     if (!username || !email || !password) { alert("Fill all fields"); return; }
 
     try {
+      // Create Auth account
       const { data: signupData, error: signupError } = await supabase.auth.signUp({ email, password });
       if (signupError) throw signupError;
 
-      // Insert row into users table
+      // Insert into users table
       await supabase.from(usersTable).insert([{ id: signupData.user.id, username, points: 0 }]);
       alert("✅ Account created successfully!");
       container.classList.remove("active");
@@ -80,7 +81,7 @@
     }
   });
 
-  // Login
+  // LOGIN
   document.getElementById("loginBtn").addEventListener("click", async () => {
     const email = document.getElementById("loginEmail").value.trim();
     const password = document.getElementById("loginPassword").value.trim();
@@ -88,18 +89,19 @@
     if (!email || !password) { alert("Fill all fields"); return; }
 
     try {
+      // Login
       const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({ email, password });
       if (loginError) throw loginError;
 
       const userId = loginData.user.id;
 
       // Fetch user row
-      let { data: userData, error: userError } = await supabase.from(usersTable).select("*").eq("id", userId).single();
+      let { data: userData } = await supabase.from(usersTable).select("*").eq("id", userId).single();
 
-      // If user row does not exist, create it
+      // If user row missing, create it
       if (!userData) {
-        await supabase.from(usersTable).insert([{ id: userId, username: loginData.user.email, points: 0 }]);
-        userData = { username: loginData.user.email, points: 0 };
+        const { data: newUser } = await supabase.from(usersTable).insert([{ id: userId, username: loginData.user.email, points: 0 }]);
+        userData = newUser[0];
       }
 
       alert(`✅ Welcome ${userData.username}! You have ${userData.points} points.`);
